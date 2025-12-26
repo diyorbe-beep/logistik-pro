@@ -111,42 +111,49 @@ const requireRole = (...roles) => {
 
 // Auth Routes
 app.post('/api/register', async (req, res) => {
-  const { username, email, password, role, userType, phone } = req.body;
+  try {
+    const { username, email, password, role, userType, phone } = req.body;
 
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Username, email, and password are required' });
+    console.log('Register request body:', req.body);
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+
+    const users = readData(USERS_FILE);
+
+    // Check if username already exists
+    if (users.find(u => u.username === username)) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    // Check if email already exists
+    if (users.find(u => u.email === email)) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const finalRole = role || (userType === 'customer' ? 'customer' : userType === 'carrier' ? 'carrier' : userType === 'operator' ? 'operator' : 'user');
+    
+    const newUser = {
+      id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
+      username,
+      email,
+      password: hashedPassword,
+      role: finalRole,
+      userType: userType || finalRole,
+      phone: phone || '',
+    };
+
+    users.push(newUser);
+    writeData(USERS_FILE, users);
+
+    const { password: _, ...userWithoutPassword } = newUser;
+    res.status(201).json({ message: 'User created successfully', user: userWithoutPassword });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
-
-  const users = readData(USERS_FILE);
-
-  // Check if username already exists
-  if (users.find(u => u.username === username)) {
-    return res.status(400).json({ error: 'Username already exists' });
-  }
-
-  // Check if email already exists
-  if (users.find(u => u.email === email)) {
-    return res.status(400).json({ error: 'Email already exists' });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const finalRole = role || (userType === 'customer' ? 'customer' : userType === 'carrier' ? 'carrier' : userType === 'operator' ? 'operator' : 'user');
-  
-  const newUser = {
-    id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
-    username,
-    email,
-    password: hashedPassword,
-    role: finalRole,
-    userType: userType || finalRole,
-    phone: phone || '',
-  };
-
-  users.push(newUser);
-  writeData(USERS_FILE, users);
-
-  const { password: _, ...userWithoutPassword } = newUser;
-  res.status(201).json({ message: 'User created successfully', user: userWithoutPassword });
 });
 
 app.post('/api/login', async (req, res) => {
