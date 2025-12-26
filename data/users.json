@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "password": "$2a$10$kQpTvWK.MWVtaU8KK8783uz02KUIXwgWgxInR5qmqAumlwdVoWFqS",
+    "role": "admin",
+    "email": "admin@logistics.com"
+  },
+  {
+    "id": 2,
+    "username": "ghost",
+    "email": "mrx120222@gmail.com",
+    "password": "$2a$10$uTWgkIJ2jvYibtbFMpGM.eQSdJ/9FMFNnzmtBZWAXNzG3BgLotsw2",
+    "role": "user"
+  }
+]

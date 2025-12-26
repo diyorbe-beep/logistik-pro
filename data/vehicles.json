@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "name": "Truck-001",
+    "type": "Truck",
+    "status": "Available"
+  },
+  {
+    "id": 2,
+    "name": "Van-002",
+    "type": "Van",
+    "status": "Available"
+  }
+]
