@@ -157,21 +157,46 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  const users = readData(USERS_FILE);
-  const user = users.find(u => u.username === username);
+  try {
+    const { username, password } = req.body;
+    
+    console.log('Login attempt:', { username, passwordProvided: !!password });
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    const users = readData(USERS_FILE);
+    console.log('Total users in database:', users.length);
+    
+    const user = users.find(u => u.username === username);
+    
+    if (!user) {
+      console.log('User not found:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    console.log('User found:', { id: user.id, username: user.username, role: user.role });
+    
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    
+    if (!passwordMatch) {
+      console.log('Password mismatch for user:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-  if (!user || !await bcrypt.compare(password, user.password)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    console.log('Login successful for user:', username);
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, email: user.email } });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
-
-  const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
-
-  res.json({ token, user: { id: user.id, username: user.username, role: user.role, email: user.email } });
 });
 
 // Shipments Routes
