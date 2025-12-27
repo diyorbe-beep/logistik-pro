@@ -186,13 +186,13 @@ app.post('/api/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { id: user.id, username: user.username, role: user.role, userType: user.userType },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     console.log('Login successful for user:', username);
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, email: user.email } });
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, userType: user.userType, email: user.email } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
@@ -219,6 +219,11 @@ app.post('/api/shipments', authenticateToken, (req, res) => {
   const newShipment = {
     id: shipments.length > 0 ? Math.max(...shipments.map(s => s.id)) + 1 : 1,
     ...req.body,
+    status: req.body.status || 'Received',
+    customerId: req.body.customerId || req.user.id,
+    operatorId: req.user.id,
+    carrierId: null,
+    operatorConfirmed: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -250,6 +255,59 @@ app.delete('/api/shipments/:id', authenticateToken, (req, res) => {
   }
   writeData(SHIPMENTS_FILE, filtered);
   res.json({ message: 'Shipment deleted successfully' });
+});
+
+// Carrier accepts shipment
+app.post('/api/shipments/:id/accept', authenticateToken, (req, res) => {
+  const shipments = readData(SHIPMENTS_FILE);
+  const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
+  if (index === -1) {
+    return res.status(404).json({ error: 'Shipment not found' });
+  }
+
+  const shipment = shipments[index];
+  if (shipment.status !== 'Received' || shipment.carrierId) {
+    return res.status(400).json({ error: 'Shipment is not available for acceptance' });
+  }
+
+  const users = readData(USERS_FILE);
+  const carrier = users.find(u => u.id === req.user.id);
+  
+  shipments[index] = {
+    ...shipment,
+    carrierId: req.user.id,
+    carrierName: carrier?.username || 'Carrier',
+    updatedAt: new Date().toISOString()
+  };
+  writeData(SHIPMENTS_FILE, shipments);
+  res.json(shipments[index]);
+});
+
+// Operator confirms carrier acceptance
+app.post('/api/shipments/:id/confirm', authenticateToken, (req, res) => {
+  const shipments = readData(SHIPMENTS_FILE);
+  const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
+  if (index === -1) {
+    return res.status(404).json({ error: 'Shipment not found' });
+  }
+
+  const shipment = shipments[index];
+  if (!shipment.carrierId) {
+    return res.status(400).json({ error: 'No carrier has accepted this shipment' });
+  }
+
+  if (shipment.operatorConfirmed) {
+    return res.status(400).json({ error: 'Shipment already confirmed' });
+  }
+
+  shipments[index] = {
+    ...shipment,
+    operatorConfirmed: true,
+    status: 'In Transit',
+    updatedAt: new Date().toISOString()
+  };
+  writeData(SHIPMENTS_FILE, shipments);
+  res.json(shipments[index]);
 });
 
 // Users Routes (Admin only)
@@ -290,8 +348,8 @@ app.post('/api/vehicles', authenticateToken, (req, res) => {
   res.status(201).json(newVehicle);
 });
 
-// Pricing Routes
-app.get('/api/pricing', authenticateToken, (req, res) => {
+// Pricing Routes (Public endpoint, but can be accessed with token for admin)
+app.get('/api/pricing', (req, res) => {
   const pricing = readData(PRICING_FILE);
   res.json(pricing);
 });
