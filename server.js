@@ -469,6 +469,149 @@ app.put('/api/profile', authenticateToken, (req, res) => {
   res.json(userWithoutPassword);
 });
 
+// Orders Routes (Customer orders)
+const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+initializeFile(ORDERS_FILE, []);
+
+app.post('/api/orders', authenticateToken, (req, res) => {
+  try {
+    const orders = readData(ORDERS_FILE);
+    const newOrder = {
+      id: orders.length > 0 ? Math.max(...orders.map(o => o.id)) + 1 : 1,
+      ...req.body,
+      customerId: req.user.id,
+      status: 'Pending',
+      orderType: 'customer_order',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    orders.push(newOrder);
+    writeData(ORDERS_FILE, orders);
+    
+    res.status(201).json(newOrder);
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
+});
+
+app.get('/api/orders', authenticateToken, (req, res) => {
+  try {
+    const orders = readData(ORDERS_FILE);
+    
+    // Filter orders based on user role
+    let filteredOrders = orders;
+    if (req.user.role === 'customer') {
+      filteredOrders = orders.filter(o => o.customerId === req.user.id);
+    }
+    
+    res.json(filteredOrders);
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// Convert order to shipment (Operator/Admin only)
+app.post('/api/orders/:id/convert-to-shipment', authenticateToken, requireRole('admin', 'operator'), (req, res) => {
+  try {
+    const orders = readData(ORDERS_FILE);
+    const shipments = readData(SHIPMENTS_FILE);
+    
+    const orderIndex = orders.findIndex(o => o.id === parseInt(req.params.id));
+    if (orderIndex === -1) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const order = orders[orderIndex];
+    
+    // Create shipment from order
+    const newShipment = {
+      id: shipments.length > 0 ? Math.max(...shipments.map(s => s.id)) + 1 : 1,
+      trackingNumber: order.trackingNumber,
+      origin: order.origin,
+      destination: order.destination,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      customerId: order.customerId,
+      weight: order.weight,
+      dimensions: order.dimensions,
+      description: order.description,
+      specialInstructions: order.specialInstructions,
+      recipientName: order.recipientName,
+      recipientPhone: order.recipientPhone,
+      recipientAddress: order.recipientAddress,
+      urgency: order.urgency,
+      estimatedPrice: order.estimatedPrice,
+      status: 'Received',
+      operatorId: req.user.id,
+      carrierId: null,
+      operatorConfirmed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      orderId: order.id
+    };
+    
+    shipments.push(newShipment);
+    writeData(SHIPMENTS_FILE, shipments);
+    
+    // Update order status
+    orders[orderIndex].status = 'Converted';
+    orders[orderIndex].shipmentId = newShipment.id;
+    orders[orderIndex].updatedAt = new Date().toISOString();
+    writeData(ORDERS_FILE, orders);
+    
+    res.json({ order: orders[orderIndex], shipment: newShipment });
+  } catch (error) {
+    console.error('Error converting order to shipment:', error);
+    res.status(500).json({ error: 'Failed to convert order' });
+  }
+});
+
+// Complete delivery endpoint
+app.post('/api/shipments/:id/complete-delivery', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+    
+    const shipment = shipments[index];
+    
+    // Check if user is authorized (carrier assigned to this shipment or admin/operator)
+    if (req.user.role !== 'admin' && req.user.role !== 'operator' && shipment.carrierId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to complete this delivery' });
+    }
+    
+    // Update shipment with delivery completion data
+    shipments[index] = {
+      ...shipment,
+      status: 'Delivered',
+      deliveryCode: req.body.deliveryCode,
+      deliveryNotes: req.body.deliveryNotes,
+      actualRecipientName: req.body.recipientName || shipment.recipientName,
+      deliveredAt: req.body.deliveredAt || new Date().toISOString(),
+      deliveredBy: req.user.id,
+      deliveryCompleted: true,
+      updatedAt: new Date().toISOString()
+    };
+    
+    writeData(SHIPMENTS_FILE, shipments);
+    
+    res.json({
+      message: 'Delivery completed successfully',
+      shipment: shipments[index]
+    });
+  } catch (error) {
+    console.error('Error completing delivery:', error);
+    res.status(500).json({ error: 'Failed to complete delivery' });
+  }
+});
+
 // News Routes
 const NEWS_FILE = path.join(DATA_DIR, 'news.json');
 initializeFile(NEWS_FILE, [
