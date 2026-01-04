@@ -12,7 +12,22 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = 'your-secret-key-change-in-production';
+
+// JWT Secret Management - Production Safe
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.warn('⚠️  WARNING: JWT_SECRET not set in environment variables. Using fallback.');
+  console.warn('⚠️  Set JWT_SECRET environment variable for production security.');
+  return 'fallback-secret-key-change-immediately-' + Date.now();
+})();
+
+// Optional: Support for secret rotation
+const JWT_SECRET_PREVIOUS = process.env.JWT_SECRET_PREVIOUS;
+
+// Validate JWT secret strength
+if (JWT_SECRET.length < 32) {
+  console.error('❌ JWT_SECRET must be at least 32 characters long for security');
+  process.exit(1);
+}
 
 // Middleware
 app.use(cors());
@@ -78,19 +93,63 @@ const writeData = (filePath, data) => {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 };
 
-// Authentication middleware
+// Enhanced Authentication middleware with proper error handling
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json({ 
+      error: 'Access token required',
+      code: 'TOKEN_MISSING'
+    });
   }
 
+  // Try current secret first
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+      // If current secret fails and we have a previous secret, try it
+      if (JWT_SECRET_PREVIOUS && err.name === 'JsonWebTokenError') {
+        return jwt.verify(token, JWT_SECRET_PREVIOUS, (prevErr, prevUser) => {
+          if (prevErr) {
+            console.log(`Token verification failed for user: ${prevErr.message}`);
+            return res.status(401).json({ 
+              error: 'Invalid or expired token',
+              code: prevErr.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+              message: 'Please log in again'
+            });
+          }
+          
+          // Token valid with previous secret - user should refresh
+          console.log(`Token verified with previous secret for user: ${prevUser.username}`);
+          req.user = prevUser;
+          req.tokenNeedsRefresh = true; // Flag for frontend to refresh token
+          next();
+        });
+      }
+      
+      // Log the specific error for debugging
+      console.log(`Token verification failed: ${err.message}, Token: ${token.substring(0, 20)}...`);
+      
+      return res.status(401).json({ 
+        error: 'Invalid or expired token',
+        code: err.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+        message: 'Please log in again'
+      });
     }
+    
+    // Verify user still exists in the system
+    const users = readData(USERS_FILE);
+    const currentUser = users.find(u => u.id === user.id);
+    if (!currentUser) {
+      console.log(`Token valid but user no longer exists: ${user.id}`);
+      return res.status(401).json({ 
+        error: 'User account no longer exists',
+        code: 'USER_NOT_FOUND',
+        message: 'Please contact administrator'
+      });
+    }
+    
     req.user = user;
     next();
   });
@@ -185,18 +244,85 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Enhanced token generation with additional security
+    const tokenPayload = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      userType: user.userType,
+      iat: Math.floor(Date.now() / 1000), // Issued at
+      jti: `${user.id}-${Date.now()}` // JWT ID for tracking
+    };
+
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, userType: user.userType },
+      tokenPayload,
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { 
+        expiresIn: '24h',
+        issuer: 'logistics-pro-api',
+        audience: 'logistics-pro-client'
+      }
     );
 
     console.log('Login successful for user:', username);
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, userType: user.userType, email: user.email } });
+    
+    // Return user info and token refresh indicator if needed
+    const response = {
+      token,
+      user: { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role, 
+        userType: user.userType, 
+        email: user.email 
+      }
+    };
+
+    res.json(response);
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
+});
+
+// Token refresh endpoint
+app.post('/api/refresh-token', authenticateToken, (req, res) => {
+  try {
+    // Generate new token with current secret
+    const tokenPayload = {
+      id: req.user.id,
+      username: req.user.username,
+      role: req.user.role,
+      userType: req.user.userType,
+      iat: Math.floor(Date.now() / 1000),
+      jti: `${req.user.id}-${Date.now()}`
+    };
+
+    const newToken = jwt.sign(
+      tokenPayload,
+      JWT_SECRET,
+      { 
+        expiresIn: '24h',
+        issuer: 'logistics-pro-api',
+        audience: 'logistics-pro-client'
+      }
+    );
+
+    console.log(`Token refreshed for user: ${req.user.username}`);
+    res.json({ token: newToken });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// Health check endpoint for monitoring
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
 });
 
 // Shipments Routes
@@ -441,15 +567,38 @@ app.get('/api/carriers/:id/history', authenticateToken, (req, res) => {
   res.json(carrierShipments);
 });
 
-// Profile Routes
+// Profile Routes with enhanced error handling
 app.get('/api/profile', authenticateToken, (req, res) => {
-  const users = readData(USERS_FILE);
-  const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  try {
+    const users = readData(USERS_FILE);
+    const user = users.find(u => u.id === req.user.id);
+    
+    if (!user) {
+      console.log(`Profile request failed - user not found: ${req.user.id}`);
+      return res.status(404).json({ 
+        error: 'User not found',
+        code: 'USER_NOT_FOUND',
+        message: 'Your account may have been deleted. Please contact administrator.'
+      });
+    }
+    
+    const { password, ...userWithoutPassword } = user;
+    
+    // Add token refresh indicator if needed
+    const response = {
+      ...userWithoutPassword,
+      ...(req.tokenNeedsRefresh && { tokenNeedsRefresh: true })
+    };
+    
+    res.json(response);
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      message: 'Please try again later'
+    });
   }
-  const { password, ...userWithoutPassword } = user;
-  res.json(userWithoutPassword);
 });
 
 app.put('/api/profile', authenticateToken, (req, res) => {
