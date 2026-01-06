@@ -13,6 +13,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 10000; // Render.com default port
 
+// Log startup information
+console.log('🚀 Starting Logistics Pro Backend Server...');
+console.log(`📊 Node.js version: ${process.version}`);
+console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`📊 Port: ${PORT}`);
+console.log(`📊 Platform: ${process.platform}`);
+console.log(`📊 Architecture: ${process.arch}`);
+console.log(`📊 Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`);
+
 // JWT Secret Management - Production Safe
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   if (process.env.NODE_ENV === 'production') {
@@ -43,13 +52,26 @@ app.use(cors({
         'https://logistik-pro.onrender.com',
         'https://logistics-pro-frontend.onrender.com'
       ]
-    : ['http://localhost:3000', 'http://localhost:5173'],
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // For legacy browser support
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Trust proxy for Render.com
+app.set('trust proxy', 1);
+
+// Add request logging for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - ${req.ip}`);
+  next();
+});
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Data file paths
 const DATA_DIR = path.join(__dirname, 'data');
@@ -343,6 +365,22 @@ app.get('/api/health', (req, res) => {
     cors_origins: process.env.NODE_ENV === 'production' 
       ? ['https://logistik-dusky.vercel.app', 'https://logistik-pro.onrender.com']
       : ['http://localhost:3000', 'http://localhost:5173']
+  });
+});
+
+// Root endpoint for Render.com health checks
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Logistics Pro API Server',
+    status: 'running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/api/health',
+      login: '/api/login',
+      register: '/api/register',
+      profile: '/api/profile'
+    }
   });
 });
 
@@ -910,11 +948,13 @@ app.get('/api/stats', authenticateToken, (req, res) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Enhanced server startup for Render.com compatibility
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 JWT Secret configured: ${JWT_SECRET ? 'Yes' : 'No'}`);
   console.log(`🌐 CORS enabled for: ${process.env.NODE_ENV === 'production' ? 'Production domains' : 'Development domains'}`);
+  console.log(`🔗 Server URL: http://0.0.0.0:${PORT}`);
   
   // Log available endpoints
   console.log('\n📋 Available API endpoints:');
@@ -923,5 +963,37 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('  GET  /api/profile');
   console.log('  GET  /api/health');
   console.log('  GET  /api/shipments');
+  console.log('  GET  /api/available-shipments');
+  console.log('  GET  /api/my-shipments');
   console.log('  ... and more\n');
+  
+  // Render.com health check confirmation
+  console.log('✅ Server is ready to accept connections');
+  console.log('✅ Health endpoint available at /api/health');
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('🔄 SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('✅ Process terminated');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🔄 SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('✅ Process terminated');
+  });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
