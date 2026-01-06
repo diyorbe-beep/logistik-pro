@@ -548,6 +548,55 @@ app.delete('/api/pricing/:id', authenticateToken, (req, res) => {
   res.json({ message: 'Pricing deleted successfully' });
 });
 
+// Available shipments for carriers (shipments without assigned carrier)
+app.get('/api/available-shipments', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    
+    // Only show shipments that are "Received" status and don't have a carrier assigned
+    const availableShipments = shipments.filter(s => 
+      s.status === 'Received' && 
+      (!s.carrierId || s.carrierId === null)
+    );
+    
+    // Sort by creation date (newest first)
+    availableShipments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    res.json(availableShipments);
+  } catch (error) {
+    console.error('Error fetching available shipments:', error);
+    res.status(500).json({ error: 'Failed to fetch available shipments' });
+  }
+});
+
+// My shipments for carriers (shipments assigned to current carrier)
+app.get('/api/my-shipments', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    
+    let myShipments = [];
+    
+    if (req.user.role === 'carrier') {
+      // For carriers: show shipments assigned to them
+      myShipments = shipments.filter(s => s.carrierId === req.user.id);
+    } else if (req.user.role === 'customer') {
+      // For customers: show shipments they created
+      myShipments = shipments.filter(s => s.customerId === req.user.id);
+    } else if (req.user.role === 'operator' || req.user.role === 'admin') {
+      // For operators/admins: show all shipments
+      myShipments = shipments;
+    }
+    
+    // Sort by creation date (newest first)
+    myShipments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    res.json(myShipments);
+  } catch (error) {
+    console.error('Error fetching my shipments:', error);
+    res.status(500).json({ error: 'Failed to fetch shipments' });
+  }
+});
+
 // Carriers Routes
 const CARRIERS_FILE = path.join(DATA_DIR, 'carriers.json');
 initializeFile(CARRIERS_FILE, []);
