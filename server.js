@@ -98,6 +98,13 @@ initializeFile(USERS_FILE, [
     password: bcrypt.hashSync('admin123', 10),
     role: 'admin',
     email: 'admin@logistics.com'
+  },
+  {
+    id: 3,
+    username: 'operator',
+    password: bcrypt.hashSync('admin123', 10),
+    role: 'operator',
+    email: 'operator@logistics.com'
   }
 ]);
 initializeFile(VEHICLES_FILE, [
@@ -256,20 +263,33 @@ app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    console.log(`🔐 Login attempt for username: ${username}`);
+    
     if (!username || !password) {
+      console.log('❌ Missing username or password');
       return res.status(400).json({ error: 'Username and password are required' });
     }
     
     const users = readData(USERS_FILE);
+    console.log(`👥 Total users in database: ${users.length}`);
+    console.log(`👥 Available usernames: ${users.map(u => u.username).join(', ')}`);
+    
     const user = users.find(u => u.username === username);
     
     if (!user) {
+      console.log(`❌ User not found: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
+    console.log(`✅ User found: ${user.username} (${user.role})`);
+    console.log(`🔑 Comparing password with hash: ${user.password.substring(0, 20)}...`);
+    
     const passwordMatch = await bcrypt.compare(password, user.password);
     
+    console.log(`🔑 Password match result: ${passwordMatch}`);
+    
     if (!passwordMatch) {
+      console.log(`❌ Password mismatch for user: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -282,6 +302,8 @@ app.post('/api/login', async (req, res) => {
     };
 
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '24h' });
+
+    console.log(`✅ Login successful for: ${user.username} (${user.role})`);
 
     res.json({
       token,
@@ -298,6 +320,26 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Test endpoint to check users (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/test/users', (req, res) => {
+    try {
+      const users = readData(USERS_FILE);
+      const safeUsers = users.map(user => ({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        hasPassword: !!user.password,
+        passwordLength: user.password ? user.password.length : 0
+      }));
+      res.json(safeUsers);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+}
 
 // Profile Routes
 app.get('/api/profile', authenticateToken, (req, res) => {

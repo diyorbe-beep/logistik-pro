@@ -2,7 +2,7 @@
   {
     "id": 1,
     "username": "admin",
-    "password": "$2a$10$kQpTvWK.MWVtaU8KK8783uz02KUIXwgWgxInR5qmqAumlwdVoWFqS",
+    "password": "$2a$10$/enbpb7E/w74VjgqWxwReuEpnRXE8uLcvvOI2V2Pq1prWScSRh1Ba",
     "role": "admin",
     "email": "admin@logistics.com"
   },
@@ -17,7 +17,7 @@
     "id": 3,
     "username": "operator",
     "email": "operator@logistics.com",
-    "password": "$2a$10$kQpTvWK.MWVtaU8KK8783uz02KUIXwgWgxInR5qmqAumlwdVoWFqS",
+    "password": "$2a$10$/enbpb7E/w74VjgqWxwReuEpnRXE8uLcvvOI2V2Pq1prWScSRh1Ba",
     "role": "operator"
   }
 ]
