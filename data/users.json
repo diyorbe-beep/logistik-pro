@@ -11,6 +11,13 @@
     "username": "ghost",
     "email": "mrx120222@gmail.com",
     "password": "$2a$10$uTWgkIJ2jvYibtbFMpGM.eQSdJ/9FMFNnzmtBZWAXNzG3BgLotsw2",
-    "role": "user"
+    "role": "customer"
+  },
+  {
+    "id": 3,
+    "username": "operator",
+    "email": "operator@logistics.com",
+    "password": "$2a$10$kQpTvWK.MWVtaU8KK8783uz02KUIXwgWgxInR5qmqAumlwdVoWFqS",
+    "role": "operator"
   }
 ]
