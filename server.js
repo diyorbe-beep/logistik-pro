@@ -23,17 +23,21 @@ console.log(`📊 Port: ${PORT}`);
 console.log('🔍 Environment check:');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
-console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
+const JWT_SECRET = process.env.JWT_SECRET || 'logistics-pro-fallback-secret-key-for-development-only-change-in-production-2025';
+
+console.log('🔐 JWT Secret configured:', JWT_SECRET ? 'Yes' : 'No');
+console.log('🔐 JWT Secret length:', JWT_SECRET.length);
+
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   console.error('❌ JWT_SECRET environment variable is required in production');
   console.error('Please set JWT_SECRET in your Render.com environment variables');
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(1);
-  }
-  console.warn('⚠️ WARNING: Using fallback JWT secret for development');
-  return 'fallback-secret-key-change-immediately-' + Date.now();
-})();
+  process.exit(1);
+}
+
+if (JWT_SECRET.length < 32) {
+  console.warn('⚠️ JWT_SECRET should be at least 32 characters long for security');
+}
 
 const JWT_SECRET_PREVIOUS = process.env.JWT_SECRET_PREVIOUS;
 
@@ -147,22 +151,31 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    console.log('❌ No token provided');
     return res.status(401).json({ 
       error: 'Access token required',
       code: 'TOKEN_MISSING'
     });
   }
 
+  console.log('🔐 Verifying token with secret length:', JWT_SECRET.length);
+
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('❌ Token verification failed:', err.message);
+      console.log('Token:', token.substring(0, 50) + '...');
+      
       if (JWT_SECRET_PREVIOUS && err.name === 'JsonWebTokenError') {
+        console.log('🔄 Trying with previous JWT secret...');
         return jwt.verify(token, JWT_SECRET_PREVIOUS, (prevErr, prevUser) => {
           if (prevErr) {
+            console.log('❌ Previous secret also failed:', prevErr.message);
             return res.status(401).json({ 
               error: 'Invalid or expired token',
               code: prevErr.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID'
             });
           }
+          console.log('✅ Token verified with previous secret');
           req.user = prevUser;
           req.tokenNeedsRefresh = true;
           next();
@@ -178,12 +191,14 @@ const authenticateToken = (req, res, next) => {
     const users = readData(USERS_FILE);
     const currentUser = users.find(u => u.id === user.id);
     if (!currentUser) {
+      console.log('❌ User not found in database:', user.id);
       return res.status(401).json({ 
         error: 'User account no longer exists',
         code: 'USER_NOT_FOUND'
       });
     }
     
+    console.log('✅ Token verified successfully for user:', user.username);
     req.user = user;
     next();
   });
@@ -433,43 +448,6 @@ app.post('/api/shipments', authenticateToken, (req, res) => {
   shipments.push(newShipment);
   writeData(SHIPMENTS_FILE, shipments);
   res.status(201).json(newShipment);
-});
-
-// Available shipments for carriers
-app.get('/api/available-shipments', authenticateToken, (req, res) => {
-  try {
-    const shipments = readData(SHIPMENTS_FILE);
-    const availableShipments = shipments.filter(s => 
-      s.status === 'Received' && (!s.carrierId || s.carrierId === null)
-    );
-    availableShipments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(availableShipments);
-  } catch (error) {
-    console.error('Error fetching available shipments:', error);
-    res.status(500).json({ error: 'Failed to fetch available shipments' });
-  }
-});
-
-// My shipments for carriers
-app.get('/api/my-shipments', authenticateToken, (req, res) => {
-  try {
-    const shipments = readData(SHIPMENTS_FILE);
-    let myShipments = [];
-    
-    if (req.user.role === 'carrier') {
-      myShipments = shipments.filter(s => s.carrierId === req.user.id);
-    } else if (req.user.role === 'customer') {
-      myShipments = shipments.filter(s => s.customerId === req.user.id);
-    } else if (req.user.role === 'operator' || req.user.role === 'admin') {
-      myShipments = shipments;
-    }
-    
-    myShipments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(myShipments);
-  } catch (error) {
-    console.error('Error fetching my shipments:', error);
-    res.status(500).json({ error: 'Failed to fetch shipments' });
-  }
 });
 
 // Accept shipment
