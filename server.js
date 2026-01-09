@@ -20,9 +20,15 @@ console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log(`📊 Port: ${PORT}`);
 
 // JWT Secret Management
+console.log('🔍 Environment check:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
+console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
+
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.error('❌ JWT_SECRET environment variable is required in production');
+  console.error('Please set JWT_SECRET in your Render.com environment variables');
   if (process.env.NODE_ENV === 'production') {
-    console.error('❌ JWT_SECRET environment variable is required in production');
     process.exit(1);
   }
   console.warn('⚠️ WARNING: Using fallback JWT secret for development');
