@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "id": 1,
+    "trackingNumber": "LP20250109001",
+    "origin": "Toshkent",
+    "destination": "Samarqand",
+    "pickupAddress": "Amir Temur ko'chasi 15",
+    "deliveryAddress": "Registon ko'chasi 25",
+    "recipientName": "Ali Valiyev",
+    "recipientPhone": "+998901234567",
+    "weight": "5.5",
+    "description": "Elektronika buyumlari",
+    "packageType": "electronics",
+    "urgency": "standard",
+    "insurance": true,
+    "packageValue": "2000000",
+    "estimatedPrice": 75000,
+    "status": "Pending",
+    "customerId": 2,
+    "createdAt": "2025-01-09T10:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "trackingNumber": "LP20250109002",
+    "origin": "Toshkent",
+    "destination": "Buxoro",
+    "pickupAddress": "Navoi ko'chasi 8",
+    "deliveryAddress": "Mustaqillik ko'chasi 12",
+    "recipientName": "Malika Karimova",
+    "recipientPhone": "+998907654321",
+    "weight": "2.3",
+    "description": "Hujjatlar",
+    "packageType": "documents",
+    "urgency": "express",
+    "insurance": false,
+    "estimatedPrice": 45000,
+    "status": "Completed",
+    "customerId": 2,
+    "createdAt": "2025-01-08T09:00:00.000Z",
+    "completedAt": "2025-01-09T14:30:00.000Z"
+  }
+]

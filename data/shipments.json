@@ -1,1 +1,44 @@
-[]
+[
+  {
+    "id": 1,
+    "trackingNumber": "LP20250109001",
+    "origin": "Toshkent",
+    "destination": "Samarqand",
+    "status": "In Transit",
+    "customerId": 2,
+    "carrierId": null,
+    "operatorId": 1,
+    "weight": "5.5",
+    "description": "Elektronika buyumlari",
+    "createdAt": "2025-01-09T10:00:00.000Z",
+    "estimatedDelivery": "2025-01-11T18:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "trackingNumber": "LP20250109002",
+    "origin": "Toshkent",
+    "destination": "Buxoro",
+    "status": "Pending",
+    "customerId": 2,
+    "carrierId": null,
+    "operatorId": 3,
+    "weight": "2.3",
+    "description": "Hujjatlar",
+    "createdAt": "2025-01-09T11:30:00.000Z",
+    "estimatedDelivery": "2025-01-12T16:00:00.000Z"
+  },
+  {
+    "id": 3,
+    "trackingNumber": "LP20250109003",
+    "origin": "Samarqand",
+    "destination": "Toshkent",
+    "status": "Delivered",
+    "customerId": 2,
+    "carrierId": null,
+    "operatorId": 1,
+    "weight": "1.2",
+    "description": "Kiyim-kechak",
+    "createdAt": "2025-01-08T09:00:00.000Z",
+    "deliveredAt": "2025-01-09T14:30:00.000Z"
+  }
+]

@@ -365,6 +365,52 @@ app.get('/api/shipments', authenticateToken, (req, res) => {
   res.json(shipments);
 });
 
+// Get user's shipments (for carriers and customers)
+app.get('/api/my-shipments', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    let userShipments = [];
+    
+    if (userRole === 'carrier') {
+      // For carriers, return shipments assigned to them
+      userShipments = shipments.filter(s => s.carrierId === userId);
+    } else if (userRole === 'customer') {
+      // For customers, return shipments they created
+      userShipments = shipments.filter(s => s.customerId === userId);
+    } else if (userRole === 'admin' || userRole === 'operator') {
+      // For admin/operator, return all shipments
+      userShipments = shipments;
+    }
+    
+    console.log(`📦 My shipments for ${req.user.username} (${userRole}): ${userShipments.length} found`);
+    res.json(userShipments);
+  } catch (error) {
+    console.error('Error fetching my shipments:', error);
+    res.status(500).json({ error: 'Failed to fetch my shipments' });
+  }
+});
+
+// Get available shipments (for carriers)
+app.get('/api/available-shipments', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    
+    // Return shipments that are not yet assigned to a carrier
+    const availableShipments = shipments.filter(s => 
+      !s.carrierId && (s.status === 'Pending' || s.status === 'Ready for Pickup')
+    );
+    
+    console.log(`📦 Available shipments: ${availableShipments.length} found`);
+    res.json(availableShipments);
+  } catch (error) {
+    console.error('Error fetching available shipments:', error);
+    res.status(500).json({ error: 'Failed to fetch available shipments' });
+  }
+});
+
 app.post('/api/shipments', authenticateToken, (req, res) => {
   const shipments = readData(SHIPMENTS_FILE);
   const newShipment = {
