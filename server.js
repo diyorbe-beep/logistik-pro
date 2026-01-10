@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10001;
 
 // Startup logging
 console.log('🚀 Starting Logistics Pro Backend Server...');
@@ -405,8 +405,30 @@ app.get('/api/profile', authenticateToken, (req, res) => {
 
 // Shipments Routes
 app.get('/api/shipments', authenticateToken, (req, res) => {
-  const shipments = readData(SHIPMENTS_FILE);
-  res.json(shipments);
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    let filteredShipments = [];
+    
+    if (userRole === 'admin' || userRole === 'operator') {
+      // Admin and operators see all shipments
+      filteredShipments = shipments;
+    } else if (userRole === 'carrier') {
+      // Carriers only see their assigned shipments
+      filteredShipments = shipments.filter(s => s.carrierId === userId);
+    } else if (userRole === 'customer') {
+      // Customers only see their own shipments
+      filteredShipments = shipments.filter(s => s.customerId === userId);
+    }
+    
+    console.log(`📦 Shipments for ${req.user.username} (${userRole}): ${filteredShipments.length} found`);
+    res.json(filteredShipments);
+  } catch (error) {
+    console.error('Error fetching shipments:', error);
+    res.status(500).json({ error: 'Failed to fetch shipments' });
+  }
 });
 
 // Get user's shipments (for carriers and customers)
@@ -471,6 +493,100 @@ app.post('/api/shipments', authenticateToken, (req, res) => {
   shipments.push(newShipment);
   writeData(SHIPMENTS_FILE, shipments);
   res.status(201).json(newShipment);
+});
+
+// Get single shipment by ID
+app.get('/api/shipments/:id', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const shipment = shipments.find(s => s.id === parseInt(req.params.id));
+    
+    if (!shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+    
+    // Check authorization
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    if (userRole === 'admin' || userRole === 'operator') {
+      // Admin and operators can see all shipments
+      res.json(shipment);
+    } else if (userRole === 'carrier' && shipment.carrierId === userId) {
+      // Carriers can see their assigned shipments
+      res.json(shipment);
+    } else if (userRole === 'customer' && shipment.customerId === userId) {
+      // Customers can see their own shipments
+      res.json(shipment);
+    } else {
+      res.status(403).json({ error: 'Not authorized to view this shipment' });
+    }
+  } catch (error) {
+    console.error('Error fetching shipment:', error);
+    res.status(500).json({ error: 'Failed to fetch shipment' });
+  }
+});
+
+// Update shipment
+app.put('/api/shipments/:id', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+    
+    const shipment = shipments[index];
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    // Check authorization
+    if (userRole !== 'admin' && userRole !== 'operator' && shipment.operatorId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to update this shipment' });
+    }
+    
+    shipments[index] = {
+      ...shipment,
+      ...req.body,
+      id: shipment.id, // Preserve ID
+      updatedAt: new Date().toISOString()
+    };
+    
+    writeData(SHIPMENTS_FILE, shipments);
+    res.json(shipments[index]);
+  } catch (error) {
+    console.error('Error updating shipment:', error);
+    res.status(500).json({ error: 'Failed to update shipment' });
+  }
+});
+
+// Delete shipment
+app.delete('/api/shipments/:id', authenticateToken, (req, res) => {
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+    
+    const shipment = shipments[index];
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    // Check authorization - only admin, operator, or the operator who created it can delete
+    if (userRole !== 'admin' && userRole !== 'operator' && shipment.operatorId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this shipment' });
+    }
+    
+    shipments.splice(index, 1);
+    writeData(SHIPMENTS_FILE, shipments);
+    res.json({ message: 'Shipment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting shipment:', error);
+    res.status(500).json({ error: 'Failed to delete shipment' });
+  }
 });
 
 // Accept shipment
@@ -560,14 +676,84 @@ app.post('/api/orders', authenticateToken, (req, res) => {
 app.get('/api/orders', authenticateToken, (req, res) => {
   try {
     const orders = readData(ORDERS_FILE);
-    let filteredOrders = orders;
-    if (req.user.role === 'customer') {
-      filteredOrders = orders.filter(o => o.customerId === req.user.id);
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    let filteredOrders = [];
+    
+    if (userRole === 'admin' || userRole === 'operator') {
+      // Admin and operators see all orders
+      filteredOrders = orders;
+    } else if (userRole === 'customer') {
+      // Customers only see their own orders
+      filteredOrders = orders.filter(o => o.customerId === userId);
     }
+    
     res.json(filteredOrders);
   } catch (error) {
     console.error('Error fetching orders:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// Convert order to shipment (Operator only)
+app.post('/api/orders/:id/convert-to-shipment', authenticateToken, requireRole('admin', 'operator'), (req, res) => {
+  try {
+    const orders = readData(ORDERS_FILE);
+    const shipments = readData(SHIPMENTS_FILE);
+    
+    const orderIndex = orders.findIndex(o => o.id === parseInt(req.params.id));
+    if (orderIndex === -1) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const order = orders[orderIndex];
+    
+    // Create shipment from order
+    const newShipment = {
+      id: shipments.length > 0 ? Math.max(...shipments.map(s => s.id)) + 1 : 1,
+      trackingNumber: order.trackingNumber,
+      origin: order.origin,
+      destination: order.destination,
+      pickupAddress: order.pickupAddress,
+      deliveryAddress: order.deliveryAddress,
+      recipientName: order.recipientName,
+      recipientPhone: order.recipientPhone,
+      weight: order.weight,
+      description: order.description,
+      packageType: order.packageType,
+      urgency: order.urgency,
+      insurance: order.insurance,
+      packageValue: order.packageValue,
+      estimatedPrice: order.estimatedPrice,
+      status: 'Received',
+      customerId: order.customerId,
+      operatorId: req.user.id,
+      carrierId: null,
+      operatorConfirmed: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    shipments.push(newShipment);
+    writeData(SHIPMENTS_FILE, shipments);
+    
+    // Update order status
+    orders[orderIndex] = {
+      ...order,
+      status: 'Converted to Shipment',
+      convertedAt: new Date().toISOString(),
+      convertedBy: req.user.id
+    };
+    writeData(ORDERS_FILE, orders);
+    
+    res.status(201).json({ 
+      message: 'Order converted to shipment successfully',
+      shipment: newShipment 
+    });
+  } catch (error) {
+    console.error('Error converting order to shipment:', error);
+    res.status(500).json({ error: 'Failed to convert order to shipment' });
   }
 });
 
@@ -583,6 +769,87 @@ app.get('/api/vehicles', authenticateToken, (req, res) => {
   res.json(vehicles);
 });
 
+// Get single vehicle by ID
+app.get('/api/vehicles/:id', authenticateToken, (req, res) => {
+  try {
+    const vehicles = readData(VEHICLES_FILE);
+    const vehicle = vehicles.find(v => v.id === parseInt(req.params.id));
+    
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    
+    res.json(vehicle);
+  } catch (error) {
+    console.error('Error fetching vehicle:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicle' });
+  }
+});
+
+// Create new vehicle
+app.post('/api/vehicles', authenticateToken, requireRole('admin', 'operator'), (req, res) => {
+  try {
+    const vehicles = readData(VEHICLES_FILE);
+    const newVehicle = {
+      id: vehicles.length > 0 ? Math.max(...vehicles.map(v => v.id)) + 1 : 1,
+      ...req.body,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    vehicles.push(newVehicle);
+    writeData(VEHICLES_FILE, vehicles);
+    res.status(201).json(newVehicle);
+  } catch (error) {
+    console.error('Error creating vehicle:', error);
+    res.status(500).json({ error: 'Failed to create vehicle' });
+  }
+});
+
+// Update vehicle
+app.put('/api/vehicles/:id', authenticateToken, requireRole('admin', 'operator'), (req, res) => {
+  try {
+    const vehicles = readData(VEHICLES_FILE);
+    const index = vehicles.findIndex(v => v.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    
+    vehicles[index] = {
+      ...vehicles[index],
+      ...req.body,
+      id: vehicles[index].id, // Preserve ID
+      updatedAt: new Date().toISOString()
+    };
+    
+    writeData(VEHICLES_FILE, vehicles);
+    res.json(vehicles[index]);
+  } catch (error) {
+    console.error('Error updating vehicle:', error);
+    res.status(500).json({ error: 'Failed to update vehicle' });
+  }
+});
+
+// Delete vehicle
+app.delete('/api/vehicles/:id', authenticateToken, requireRole('admin', 'operator'), (req, res) => {
+  try {
+    const vehicles = readData(VEHICLES_FILE);
+    const index = vehicles.findIndex(v => v.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    
+    vehicles.splice(index, 1);
+    writeData(VEHICLES_FILE, vehicles);
+    res.json({ message: 'Vehicle deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting vehicle:', error);
+    res.status(500).json({ error: 'Failed to delete vehicle' });
+  }
+});
+
 // News Routes
 app.get('/api/news', (req, res) => {
   const news = readData(NEWS_FILE);
@@ -596,15 +863,82 @@ app.get('/api/carriers', authenticateToken, (req, res) => {
   res.json(carriers);
 });
 
+// Users Routes (Admin only)
+app.get('/api/users', authenticateToken, requireRole('admin'), (req, res) => {
+  try {
+    const users = readData(USERS_FILE);
+    // Remove passwords from response
+    const safeUsers = users.map(user => {
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    });
+    res.json(safeUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 // Dashboard Stats
 app.get('/api/stats', authenticateToken, (req, res) => {
-  const shipments = readData(SHIPMENTS_FILE);
-  const total = shipments.length;
-  const inTransit = shipments.filter(s => s.status === 'In Transit').length;
-  const delivered = shipments.filter(s => s.status === 'Delivered').length;
-  const received = shipments.filter(s => s.status === 'Received').length;
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    let filteredShipments = [];
+    
+    if (userRole === 'admin' || userRole === 'operator') {
+      // Admin and operators see all shipments
+      filteredShipments = shipments;
+    } else if (userRole === 'carrier') {
+      // Carriers only see their assigned shipments
+      filteredShipments = shipments.filter(s => s.carrierId === userId);
+    } else if (userRole === 'customer') {
+      // Customers only see their own shipments
+      filteredShipments = shipments.filter(s => s.customerId === userId);
+    }
+    
+    const total = filteredShipments.length;
+    const inTransit = filteredShipments.filter(s => s.status === 'In Transit').length;
+    const delivered = filteredShipments.filter(s => s.status === 'Delivered').length;
+    const received = filteredShipments.filter(s => s.status === 'Received').length;
+    const pending = filteredShipments.filter(s => s.status === 'Pending').length;
+    
+    // Generate monthly data for the last 6 months
+    const monthlyData = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const monthKey = `${year}-${month}`;
+      
+      const monthShipments = filteredShipments.filter(s => {
+        const shipmentDate = new Date(s.createdAt);
+        const shipmentMonth = `${shipmentDate.getFullYear()}-${String(shipmentDate.getMonth() + 1).padStart(2, '0')}`;
+        return shipmentMonth === monthKey;
+      });
+      
+      monthlyData.push({
+        month: monthKey,
+        count: monthShipments.length
+      });
+    }
 
-  res.json({ total, inTransit, delivered, received });
+    res.json({ 
+      total, 
+      inTransit, 
+      delivered, 
+      received, 
+      pending,
+      monthly: monthlyData 
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
 });
 
 // Error handling middleware
