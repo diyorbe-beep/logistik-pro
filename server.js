@@ -591,28 +591,34 @@ app.delete('/api/shipments/:id', authenticateToken, (req, res) => {
 
 // Accept shipment
 app.post('/api/shipments/:id/accept', authenticateToken, (req, res) => {
-  const shipments = readData(SHIPMENTS_FILE);
-  const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
-  if (index === -1) {
-    return res.status(404).json({ error: 'Shipment not found' });
-  }
+  try {
+    const shipments = readData(SHIPMENTS_FILE);
+    const index = shipments.findIndex(s => s.id === parseInt(req.params.id));
+    if (index === -1) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
 
-  const shipment = shipments[index];
-  if (shipment.status !== 'Received' || shipment.carrierId) {
-    return res.status(400).json({ error: 'Shipment is not available for acceptance' });
-  }
+    const shipment = shipments[index];
+    if (shipment.status !== 'Received' || shipment.carrierId) {
+      return res.status(400).json({ error: 'Shipment is not available for acceptance' });
+    }
 
-  const users = readData(USERS_FILE);
-  const carrier = users.find(u => u.id === req.user.id);
-  
-  shipments[index] = {
-    ...shipment,
-    carrierId: req.user.id,
-    carrierName: carrier?.username || 'Carrier',
-    updatedAt: new Date().toISOString()
-  };
-  writeData(SHIPMENTS_FILE, shipments);
-  res.json(shipments[index]);
+    const users = readData(USERS_FILE);
+    const carrier = users.find(u => u.id === req.user.id);
+    
+    shipments[index] = {
+      ...shipment,
+      carrierId: req.user.id,
+      carrierName: carrier?.username || 'Carrier',
+      status: 'In Transit', // Change status to In Transit when accepted
+      updatedAt: new Date().toISOString()
+    };
+    writeData(SHIPMENTS_FILE, shipments);
+    res.json(shipments[index]);
+  } catch (error) {
+    console.error('Error accepting shipment:', error);
+    res.status(500).json({ error: 'Failed to accept shipment' });
+  }
 });
 
 // Complete delivery

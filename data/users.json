@@ -19,5 +19,12 @@
     "email": "operator@logistics.com",
     "password": "$2a$10$/enbpb7E/w74VjgqWxwReuEpnRXE8uLcvvOI2V2Pq1prWScSRh1Ba",
     "role": "operator"
+  },
+  {
+    "id": 4,
+    "username": "carrier",
+    "email": "carrier@logistics.com",
+    "password": "$2a$10$/enbpb7E/w74VjgqWxwReuEpnRXE8uLcvvOI2V2Pq1prWScSRh1Ba",
+    "role": "carrier"
   }
 ]
