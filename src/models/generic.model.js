@@ -1,6 +1,6 @@
 import { readData, writeData, DATA_FILES } from '../utils/fileDb.js';
 
-const createModel = (fileKey) => ({
+export const createModel = (fileKey) => ({
   findAll: () => readData(DATA_FILES[fileKey]),
   
   findById: (id) => {

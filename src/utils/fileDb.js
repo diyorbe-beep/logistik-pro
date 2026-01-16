@@ -15,6 +15,7 @@ export const DATA_FILES = {
   PRICING: path.join(config.dataDir, 'pricing.json'),
   CARRIERS: path.join(config.dataDir, 'carriers.json'),
   NEWS: path.join(config.dataDir, 'news.json'),
+  NOTIFICATIONS: path.join(config.dataDir, 'notifications.json'),
 };
 
 // Initialize file if not exists

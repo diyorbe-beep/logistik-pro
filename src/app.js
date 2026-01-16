@@ -6,12 +6,19 @@ import morgan from 'morgan';
 import { config } from './config/config.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
-import shipmentRoutes from './routes/shipment.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // Security Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Allow frontend to load images
+}));
 app.use(cors({
   origin: config.frontendUrl, // Restrict to frontend URL
   credentials: true,
@@ -29,15 +36,24 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Trust proxy (for Render/Heroku)
 app.set('trust proxy', 1);
 
+// Static Files (Uploads)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Health Check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', env: config.env, version: '2.0.0' });
+  res.json({ status: 'healthy', env: config.env, version: '2.1.0' });
 });
+
+import notificationRoutes from './routes/notification.routes.js';
+
+// ... (existing code)
 
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 404 Handler
 app.use((req, res) => {
