@@ -58,6 +58,7 @@ app.use('/api/notifications', notificationRoutes);
 
 // Serve Frontend Static Files
 const distPath = path.join(__dirname, '../../dist');
+console.log('Serving static files from:', distPath); // DEBUG LOG
 app.use(express.static(distPath));
 
 // 404 Handler for API requests (must be before catch-all)
