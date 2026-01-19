@@ -20,12 +20,30 @@ const app = express();
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" } // Allow frontend to load images
 }));
+const allowedOrigins = [
+  config.frontendUrl,
+  'https://logistik-ecru.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+
 app.use(cors({
-  origin: config.frontendUrl, // Restrict to frontend URL
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || !config.env === 'production') {
+      callback(null, true);
+    } else {
+      console.log('Blocked CORS origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control']
 }));
+
 
 // Logging
 app.use(morgan('dev'));
