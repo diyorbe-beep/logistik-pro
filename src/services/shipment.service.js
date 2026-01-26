@@ -2,6 +2,8 @@ import { ShipmentModel } from '../models/generic.model.js';
 import { NotificationService } from './notification.service.js';
 
 export const ShipmentService = {
+  getAll: (user) => {
+    const shipments = ShipmentModel.findAll();
     if (user.role === 'admin') return shipments;
     if (user.role === 'operator') return shipments.filter(s => String(s.operatorId) === String(user.id));
     // Carrier sees their own shipments AND unassigned ones
