@@ -7,70 +7,11 @@ import { config } from './config/config.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import shipmentRoutes from './routes/shipment.routes.js';
+import orderRoutes from './routes/order.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-
-// Security Middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" } // Allow frontend to load images
-}));
-const allowedOrigins = [
-  config.frontendUrl,
-  'https://logistik-ecru.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173'
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || !config.env === 'production') {
-      callback(null, true);
-    } else {
-      console.log('Blocked CORS origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control']
-}));
-
-
-// Logging
-app.use(morgan('dev'));
-
-// Parsing
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Trust proxy (for Render/Heroku)
-app.set('trust proxy', 1);
-
-// Static Files (Uploads)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', env: config.env, version: '2.1.0' });
-});
-
-import notificationRoutes from './routes/notification.routes.js';
-
-// ... (existing code)
-
-// Routes
-app.use('/api', authRoutes);
-app.use('/api/users', userRoutes);
+// ...
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
 
