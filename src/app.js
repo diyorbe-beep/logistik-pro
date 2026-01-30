@@ -36,6 +36,11 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
 
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Serve Frontend Static Files
 // Assuming 'dist' is in the project root, two levels up from 'backend/src'
 const distPath = path.join(__dirname, '../../dist');
