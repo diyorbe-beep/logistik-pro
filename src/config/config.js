@@ -16,7 +16,8 @@ export const config = {
   dataDir: path.join(__dirname, '../../data'),
 };
 
+// Fallback for JWT Secret to prevent crash
 if (!config.jwtSecret) {
-  console.error('FATAL: JWT_SECRET is not defined in .env');
-  process.exit(1);
+  console.warn('WARNING: JWT_SECRET is not defined. Using default insecure secret.');
+  config.jwtSecret = 'default-insecure-secret-please-change';
 }
