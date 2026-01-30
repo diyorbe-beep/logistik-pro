@@ -9,6 +9,7 @@ import userRoutes from './routes/user.routes.js';
 import shipmentRoutes from './routes/shipment.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 // ...
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/orders', orderRoutes);
