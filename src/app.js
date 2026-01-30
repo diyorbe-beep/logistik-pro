@@ -41,22 +41,17 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve Frontend Static Files
-// Assuming 'dist' is in the project root, two levels up from 'backend/src'
-const distPath = path.join(__dirname, '../../dist');
-console.log('Serving static files from:', distPath); 
+// Root Route (Welcome Message)
+app.get('/', (req, res) => {
+  res.json({ message: 'Logistik Pro API is running', version: '1.0.0' });
+});
 
-app.use(express.static(distPath));
-
-// 404 Handler for API requests (must be before catch-all)
-app.use('/api/*', (req, res) => {
+// 404 Handler for API requests
+app.use('*', (req, res) => {
   res.status(404).json({ error: 'API Endpoint not found' });
 });
 
-// React SPA Catch-all (for non-API requests)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
+// General Error Handler
 
 // General Error Handler
 app.use((err, req, res, next) => {
