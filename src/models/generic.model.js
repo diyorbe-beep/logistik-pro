@@ -49,3 +49,4 @@ export const VehicleModel = createModel('VEHICLES');
 export const PricingModel = createModel('PRICING');
 export const CarrierModel = createModel('CARRIERS');
 export const NewsModel = createModel('NEWS');
+export const UserModel = createModel('USERS');
