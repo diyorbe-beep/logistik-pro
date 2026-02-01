@@ -12,5 +12,6 @@ router.post('/', ShipmentController.create);
 router.put('/:id', ShipmentController.update);
 router.delete('/:id', ShipmentController.delete);
 router.post('/:id/complete-delivery', ShipmentController.completeDelivery);
+router.post('/:id/accept', ShipmentController.accept);
 
 export default router;

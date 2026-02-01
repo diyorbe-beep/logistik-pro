@@ -121,6 +121,51 @@ export const ShipmentService = {
      return ShipmentModel.delete(id);
   },
 
+  acceptShipment: (id, user) => {
+    const shipment = ShipmentModel.findById(id);
+    if (!shipment) return null;
+
+    if (user.role !== 'carrier') {
+      throw new Error('Only carriers can accept shipments');
+    }
+
+    if (shipment.carrierId) {
+      throw new Error('Shipment already accepted by another carrier');
+    }
+
+    const updates = {
+      carrierId: user.id,
+      carrierName: user.username,
+      status: 'In Transit',
+      updatedAt: new Date().toISOString()
+    };
+
+    const historyEntry = {
+      status: 'In Transit',
+      timestamp: new Date().toISOString(),
+      updatedBy: user.username,
+      userId: user.id,
+      role: user.role,
+      note: 'Shipment accepted by carrier'
+    };
+
+    const currentHistory = shipment.history || [];
+    updates.history = [...currentHistory, historyEntry];
+
+    // Notify Operator
+    if (shipment.operatorId) {
+      NotificationService.create(
+        shipment.operatorId,
+        'Yuk qabul qilindi',
+        `Sizning #${shipment.id} raqamli yukingiz ${user.username} tomonidan qabul qilindi va hozirda yo'lda.`,
+        'info',
+        `/shipments/view/${id}`
+      );
+    }
+
+    return ShipmentModel.update(id, updates);
+  },
+
   completeDelivery: (id, data, user) => {
     const shipment = ShipmentModel.findById(id);
     if (!shipment) return null;

@@ -61,5 +61,18 @@ export const ShipmentController = {
       if (error.message === 'Unauthorized complete delivery') return res.status(403).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
+  },
+
+  accept: (req, res) => {
+    try {
+      const shipment = ShipmentService.acceptShipment(req.params.id, req.user);
+      if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+      res.json(shipment);
+    } catch (error) {
+      if (error.message === 'Only carriers can accept shipments' || error.message === 'Shipment already accepted by another carrier') {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
   }
 };
