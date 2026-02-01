@@ -12,6 +12,10 @@ import shipmentRoutes from './routes/shipment.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import vehicleRoutes from './routes/vehicle.routes.js';
+import pricingRoutes from './routes/pricing.routes.js';
+import carrierRoutes from './routes/carrier.routes.js';
+import newsRoutes from './routes/news.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +39,10 @@ app.use('/api/shipments', shipmentRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/carriers', carrierRoutes);
+app.use('/api/news', newsRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {
