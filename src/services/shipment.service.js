@@ -119,5 +119,48 @@ export const ShipmentService = {
      }
      
      return ShipmentModel.delete(id);
+  },
+
+  completeDelivery: (id, data, user) => {
+    const shipment = ShipmentModel.findById(id);
+    if (!shipment) return null;
+
+    if (user.role !== 'admin' && user.role !== 'operator' && String(shipment.carrierId) !== String(user.id)) {
+      throw new Error('Unauthorized complete delivery');
+    }
+
+    const updates = {
+      status: 'Delivered',
+      deliveryCode: data.deliveryCode,
+      deliveryNotes: data.deliveryNotes,
+      deliveredAt: new Date().toISOString(),
+      deliveredBy: user.id,
+      deliveryCompleted: true
+    };
+
+    const historyEntry = {
+      status: 'Delivered',
+      timestamp: new Date().toISOString(),
+      updatedBy: user.username,
+      userId: user.id,
+      role: user.role,
+      note: data.deliveryNotes || 'Delivery completed successfully'
+    };
+
+    const currentHistory = shipment.history || [];
+    updates.history = [...currentHistory, historyEntry];
+
+    // Notify Customer
+    if (shipment.customerId) {
+      NotificationService.create(
+        shipment.customerId,
+        'Yuk yetkazib berildi',
+        `Sizning #${shipment.id} raqamli yukingiz muvaffaqiyatli yetkazib berildi.`,
+        'success',
+        `/shipments/${id}`
+      );
+    }
+
+    return ShipmentModel.update(id, updates);
   }
 };

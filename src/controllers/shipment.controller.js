@@ -46,8 +46,19 @@ export const ShipmentController = {
       const success = ShipmentService.delete(req.params.id, req.user);
       if (!success) return res.status(404).json({ error: 'Shipment not found' });
       res.json({ message: 'Shipment deleted' });
+     } catch (error) {
+       if (error.message === 'Unauthorized delete') return res.status(403).json({ error: error.message });
+       res.status(500).json({ error: error.message });
+     }
+  },
+
+  completeDelivery: (req, res) => {
+    try {
+      const shipment = ShipmentService.completeDelivery(req.params.id, req.body, req.user);
+      if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+      res.json(shipment);
     } catch (error) {
-      if (error.message === 'Unauthorized delete') return res.status(403).json({ error: error.message });
+      if (error.message === 'Unauthorized complete delivery') return res.status(403).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }
